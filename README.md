@@ -20,7 +20,7 @@ cloud, and no app to install on the phone.
 - **In-call screen** with a timer, mute, keypad (DTMF), hold/swap, and a laptop ⇄ phone audio switch.
 - **Call recording.** Records both sides into a single file, with an optional auto-record for
   every call. A red REC dot in the bar shows when a recording is running.
-- **Ring and missed-call notifications** with Answer/Decline actions.
+- **Ring and missed-call notifications.** Click one to open the panel, and the panel also opens by itself when the phone rings.
 - **CLI** for scripts and Hyprland keybinds: `quattro-bt-phone answer`, `hangup`, `dial …`.
 - **Nix flake** with a home-manager module.
 
@@ -85,7 +85,7 @@ Click the phone icon in the bar. From the CLI:
 
 ```sh
 quattro-bt-phone status
-quattro-bt-phone dial "+31 6 1234 5678"
+quattro-bt-phone dial "+31 6 1234 5678"   # asks first; --yes for keybinds/scripts
 quattro-bt-phone answer | decline | hangup
 quattro-bt-phone tones 1234#
 quattro-bt-phone sync            # refresh contacts and call history from the phone
@@ -117,7 +117,8 @@ cargo clippy --all-targets -- -D warnings
 omarchy plugin validate plugin
 ```
 
-For UI work without a phone, run the daemon with `--mock`. It replays a scripted call.
+For UI work without a phone, run the daemon with `--mock` and drive it with
+`quattro-bt-phone simulate ring|remote-answer|remote-hangup|disconnect|reset-setup`.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and PR workflow.
 
 The code follows Omarchy's own conventions (`AGENTS.md`, `docs/theming.md`, `.editorconfig`).

@@ -68,6 +68,10 @@ Every message has a `type`.
   }
   ```
 
+  `sync.status` goes `awaiting_approval` (the phone may be asking "Allow access to contacts?")
+  → `syncing` → `idle`, or `error` with `sync.error` set. The daemon syncs again by itself
+  whenever the phone connects, but only after a first sync that the user started has worked.
+
   Permissions (`calls`, `contacts`) are `unknown`, `requesting`, `granted` or `denied`.
   Call states follow oFono: `incoming`, `waiting`, `dialing`, `alerting`, `active`, `held`,
   `disconnected`. Timestamps are Unix seconds, so clients compute call timers themselves.

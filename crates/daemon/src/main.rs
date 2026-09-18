@@ -3,11 +3,10 @@ mod bluez;
 mod config;
 mod dbus;
 mod notify;
+mod pbap;
 mod server;
 mod store;
 mod telephony;
-// Read by the PBAP sync (#8), which lands next.
-#[allow(dead_code)]
 mod vcard;
 
 use std::path::PathBuf;

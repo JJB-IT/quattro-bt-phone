@@ -115,6 +115,18 @@ pub enum Command {
     SetAutoRecord {
         enabled: bool,
     },
+    /// The ringing tone for outgoing calls, or none (saved to config).
+    SetRingback {
+        style: RingbackStyle,
+        /// With `custom`: a file name from `get_ringtones`.
+        #[serde(default)]
+        file: Option<String>,
+    },
+    /// The user's own ringing tones → `ringtones`.
+    GetRingtones,
+    /// Open the desktop's file chooser; the picked audio file is copied into the ringtones
+    /// folder and becomes the custom ringing tone. Replies at once; `state` follows.
+    ChooseRingtone,
     /// Turn the keypad sounds on or off (saved to config).
     SetKeypadSounds {
         enabled: bool,
@@ -180,6 +192,11 @@ pub enum Message {
     AudioDevices {
         outputs: Vec<AudioDevice>,
         inputs: Vec<AudioDevice>,
+    },
+    Ringtones {
+        /// The folder to put audio files in (WAV, FLAC, OGG, MP3).
+        dir: String,
+        files: Vec<String>,
     },
     Reply {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -404,6 +421,31 @@ pub struct Settings {
     /// Beep when dialling.
     #[serde(default)]
     pub keypad_sounds: bool,
+    /// The ringing tone played while an outgoing call rings.
+    #[serde(default)]
+    pub ringback: RingbackStyle,
+    /// With `ringback: custom`: a file name in the ringtones folder (see `get_ringtones`).
+    #[serde(default)]
+    pub ringback_file: Option<String>,
+}
+
+/// National ringing tones (what the caller hears while the other phone rings).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RingbackStyle {
+    /// 425 Hz, 1 s on, 4 s off (most of Europe, ITU-T recommendation).
+    #[default]
+    Europe,
+    /// 400+450 Hz double ring (UK, Ireland, South Africa, Australia, …).
+    Uk,
+    /// 440+480 Hz, 2 s on, 4 s off.
+    NorthAmerica,
+    /// Two soft rising notes every 3 s.
+    Chime,
+    /// The user's own file (`ringback_file`).
+    Custom,
+    /// No ringing tone.
+    Off,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

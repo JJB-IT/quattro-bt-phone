@@ -28,6 +28,7 @@ struct Mock {
     recordings: Vec<Recording>,
     next_call: u32,
     later: mpsc::Sender<(Duration, Later)>,
+    ringback: crate::tones::Ringback,
 }
 
 pub async fn run(mut jobs: mpsc::Receiver<Job>, state_tx: watch::Sender<State>, auto_record: bool) {
@@ -50,6 +51,7 @@ pub async fn run(mut jobs: mpsc::Receiver<Job>, state_tx: watch::Sender<State>, 
         recordings: recordings(),
         next_call: 1,
         later,
+        ringback: Default::default(),
     };
     publish(&state_tx, &m.state);
 
@@ -62,6 +64,7 @@ pub async fn run(mut jobs: mpsc::Receiver<Job>, state_tx: watch::Sender<State>, 
             }
             Some(what) = due.recv() => m.fire(what),
         }
+        m.sync_ringback();
         publish(&state_tx, &m.state);
     }
 }
@@ -104,6 +107,21 @@ fn devices() -> Vec<Device> {
 }
 
 impl Mock {
+    /// Like the real daemon: a ringing tone while our outgoing call rings.
+    fn sync_ringback(&mut self) {
+        if self
+            .state
+            .calls
+            .iter()
+            .any(|c| c.direction == Direction::Outgoing && c.state == CallState::Alerting)
+        {
+            let s = &self.state.settings;
+            self.ringback.start(s.ringback, s.ringback_file.as_deref(), None);
+        } else {
+            self.ringback.stop();
+        }
+    }
+
     fn after(&self, ms: u64, what: Later) {
         let _ = self.later.try_send((Duration::from_millis(ms), what));
     }
@@ -385,6 +403,19 @@ impl Mock {
 
             Command::SetAutoRecord { enabled } => self.state.settings.auto_record = enabled,
             Command::SetKeypadSounds { enabled } => self.state.settings.keypad_sounds = enabled,
+            Command::SetRingback { style, file } => {
+                if style == RingbackStyle::Custom {
+                    self.state.settings.ringback_file = file;
+                }
+                self.state.settings.ringback = style;
+                self.ringback.stop();
+            }
+            Command::ChooseRingtone => anyhow::bail!("the file chooser isn't available with --mock"),
+            Command::GetRingtones => {
+                let files = crate::tones::ringtones()?;
+                let dir = crate::tones::ringtones_dir().display().to_string();
+                return Ok(Some(Message::Ringtones { dir, files }));
+            }
             // Real sound even in --mock: it's the easiest way to hear what the panel does.
             Command::PlayKeySound { key, soft } => {
                 if self.state.settings.keypad_sounds {

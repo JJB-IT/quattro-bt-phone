@@ -32,6 +32,9 @@ All notable changes to this project are documented here. The format follows
 - Mute on real calls: it stops the microphone bridge to the phone.
 - Keypad sounds (off by default, in the panel's settings or `quattro-bt-phone keypad-sounds on`):
   a DTMF tone for each clicked dialer key and a soft tick for typed digits.
+- A ringing tone while an outgoing call rings: the phone only hands the call audio over once
+  the call connects. European, UK/South African or North American style, a soft chime, your
+  own audio file (picked in the desktop's file chooser), or off.
 - `quattro-bt-phone` CLI. `dial` asks for confirmation unless `--yes` is given.
 - Project documentation, research notes and repository workflow.
 - Contribution guide aligned with Omarchy's style, theming and commit conventions.

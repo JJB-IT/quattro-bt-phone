@@ -38,6 +38,9 @@ Every request has a `cmd`, plus an optional numeric `id` that is echoed back in 
 | `get_recordings` | | → `recordings` |
 | `set_auto_record` | `enabled` | Saved to config |
 | `set_keypad_sounds` | `enabled` | Saved to config |
+| `set_ringback` | `style`: `europe`\|`uk`\|`north_america`\|`chime`\|`custom`\|`off`, `file`? | Ringing tone while an outgoing call rings (the phone only hands over audio once connected). `custom` needs a `file` from `get_ringtones`. Saved to config |
+| `get_ringtones` | | → `ringtones` |
+| `choose_ringtone` | | Opens the desktop file chooser; the picked file is copied to the ringtones folder and used |
 | `play_key_sound` | `key`, `soft`? | A key's DTMF tone, or a soft tick for a typed key (`soft`); nothing while keypad sounds are off |
 | `start_recording` / `stop_recording` | `discard`? | Manual recording control |
 | `delete_recording` | `id` | Delete a recording file |
@@ -47,6 +50,7 @@ Every request has a `cmd`, plus an optional numeric `id` that is echoed back in 
 
 Every message has a `type`.
 
+- **`ringtones`**: `{"type":"ringtones","dir":"/home/me/.config/quattro-bt-phone/ringtones","files":["my tone.mp3"]}`.
 - **`audio_devices`**: `{"type":"audio_devices","outputs":[{"name":"alsa_output.pci-…","description":"Built-in Audio Analog Stereo"}],"inputs":[…]}`.
   The phone's own call nodes are left out.
 - **`reply`**: `{"type":"reply","id":1,"ok":true}` or `{"type":"reply","ok":false,"error":"…"}`.
@@ -70,7 +74,7 @@ Every message has a `type`.
     "audio": { "route": "laptop", "muted": false },
     "recording": { "call": "…", "path": "…", "started_at": 1789735201 },
     "sync": { "status": "idle", "error": null, "last_synced": 1789735000, "contacts": 1098, "history": 300 },
-    "settings": { "auto_record": false, "audio_output": null, "audio_input": "alsa_input.pci-…", "keypad_sounds": true }
+    "settings": { "auto_record": false, "audio_output": null, "audio_input": "alsa_input.pci-…", "keypad_sounds": true, "ringback": "custom", "ringback_file": "my tone.mp3" }
   }
   ```
 

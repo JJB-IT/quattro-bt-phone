@@ -27,6 +27,8 @@ use crate::telephony::{self, Gateway, RawCall};
 const PERMISSION_TIMEOUT: Duration = Duration::from_secs(45);
 /// Safety net in case a signal is missed.
 const POLL: Duration = Duration::from_secs(30);
+/// A call that appears this soon after `dial` is the one we dialled.
+const DIAL_CLAIM: Duration = Duration::from_secs(15);
 /// How often to look for the phone's audio nodes while a call waits for them.
 const AUDIO_RETRY: Duration = Duration::from_millis(500);
 /// Most entries `get_recents` returns.
@@ -49,6 +51,10 @@ struct Tracked {
     name: Option<String>,
     label: Option<String>,
     last_state: CallState,
+    /// Placed or answered from the computer, so its audio belongs here.
+    on_computer: bool,
+    /// The call state in which the audio was last asked for, so each state asks once.
+    audio_requested: Option<CallState>,
 }
 
 pub struct Real {
@@ -72,6 +78,10 @@ pub struct Real {
     was_connected: bool,
     done: mpsc::Sender<Done>,
     audio: Router,
+    /// When `dial` last went to the phone: the outgoing call that appears next is ours.
+    dialled_at: Option<Instant>,
+    /// Last seen SCO transport state, for the log.
+    transport: Option<String>,
 }
 
 pub async fn run(
@@ -102,6 +112,8 @@ pub async fn run(
         calls_requested: None,
         calls_denied: false,
         audio: Router::default(),
+        dialled_at: None,
+        transport: None,
         connecting: false,
         syncing: false,
         was_connected: false,
@@ -286,12 +298,15 @@ impl Real {
                 tracing::info!(state = %rc.state, "unknown call state");
                 continue;
             };
+            let dialled_at = &mut self.dialled_at;
             let t = self.tracked.entry(id.clone()).or_insert_with(|| {
                 let direction = if state.is_ringing() { Direction::Incoming } else { Direction::Outgoing };
+                let on_computer = direction == Direction::Outgoing
+                    && dialled_at.take().is_some_and(|t| t.elapsed() < DIAL_CLAIM);
                 if state.is_ringing() {
                     newly_ringing = Some(id.clone());
                 }
-                tracing::info!(?direction, ?state, "call appeared");
+                tracing::info!(?direction, ?state, on_computer, "call appeared");
                 let (name, label) = match lookup(&self.store, &rc.number) {
                     Some((name, label)) => (Some(name), Some(label)),
                     None => ((!rc.name.is_empty()).then(|| rc.name.clone()), None),
@@ -303,6 +318,8 @@ impl Real {
                     name,
                     label,
                     last_state: state,
+                    on_computer,
+                    audio_requested: None,
                 }
             });
             if state == CallState::Active && t.started_at.is_none() {
@@ -359,8 +376,31 @@ impl Real {
         }
     }
 
-    /// Bridge the call audio while a call's audio is on the computer.
+    /// Bridge the call audio while a call's audio is on the computer, and ask the phone for
+    /// the audio of calls placed or answered here (the phone keeps it otherwise).
     async fn route_audio(&mut self) {
+        let transport = self.gateway.as_ref().and_then(|g| g.transport.clone());
+        if transport != self.transport {
+            tracing::info!(from = ?self.transport, to = ?transport, "call audio transport");
+            self.transport = transport.clone();
+        }
+        if transport.as_deref() != Some("active")
+            && let Some(gw) = self.gateway.clone()
+        {
+            let wanted = self.tracked.values_mut().find(|t| {
+                t.on_computer
+                    && matches!(t.last_state, CallState::Alerting | CallState::Active)
+                    && t.audio_requested != Some(t.last_state)
+            });
+            if let Some(t) = wanted {
+                t.audio_requested = Some(t.last_state);
+                tracing::info!(state = ?t.last_state, "asking the phone for the call audio");
+                if let Err(e) = telephony::activate_audio(&self.session, &gw).await {
+                    tracing::warn!("moving call audio to the computer: {e}");
+                }
+            }
+        }
+
         let live = self
             .gateway
             .as_ref()
@@ -553,6 +593,7 @@ impl Real {
             Command::Dial { number } => {
                 let number = validate_dial(&number)?;
                 telephony::dial(&self.session, self.gateway()?, &number).await?;
+                self.dialled_at = Some(Instant::now());
             }
             Command::Answer { call } => {
                 let c = self.find_call(&call, CallState::is_ringing)?;
@@ -561,6 +602,9 @@ impl Real {
                     telephony::hold_and_answer(&self.session, self.gateway()?).await?;
                 } else {
                     telephony::answer(&self.session, &c).await?;
+                }
+                if let Some(t) = self.tracked.get_mut(c.path.as_str()) {
+                    t.on_computer = true;
                 }
             }
             Command::Decline { call } => {
@@ -583,7 +627,10 @@ impl Real {
             }
             Command::Hold | Command::Swap => telephony::swap_calls(&self.session, self.gateway()?).await?,
             Command::SetRoute { route: AudioRoute::Laptop } => {
-                telephony::activate_audio(&self.session, self.gateway()?).await?
+                telephony::activate_audio(&self.session, self.gateway()?).await?;
+                for t in self.tracked.values_mut() {
+                    t.on_computer = true;
+                }
             }
             Command::SetRoute { route: AudioRoute::Phone } => {
                 bail!("moving call audio back to the phone is not supported yet (#2)")

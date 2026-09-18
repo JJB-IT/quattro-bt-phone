@@ -15,3 +15,10 @@ indent_size = 4
 # Markdown lists and ASCII diagrams need free-form indentation.
 [*.md]
 indent_size = unset
+
+# PBAP serves vCards with CRLF line endings and folded lines; the test fixtures keep both.
+[crates/*/testdata/*.vcf]
+end_of_line = crlf
+trim_trailing_whitespace = false
+indent_style = unset
+indent_size = unset

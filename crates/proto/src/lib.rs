@@ -114,6 +114,28 @@ pub enum Command {
     DeleteRecording {
         id: i64,
     },
+
+    /// `--mock` only: simulate something the phone would do.
+    Simulate {
+        event: SimEvent,
+        #[serde(default)]
+        number: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SimEvent {
+    /// An incoming call rings.
+    Ring,
+    /// The remote party answers our outgoing call.
+    RemoteAnswer,
+    /// The remote party hangs up (or stops ringing: a missed call).
+    RemoteHangup,
+    /// Bluetooth link drops.
+    Disconnect,
+    /// Start over from "no phone selected".
+    ResetSetup,
 }
 
 // ---------------------------------------------------------------------------

@@ -34,8 +34,10 @@ is needed. Interfaces (from the `libspa-bluez5.so` introspection XML):
   `GetManagedObjects`.
 - Call `State` values follow oFono: `incoming`, `waiting`, `dialing`, `alerting`, `active`,
   `held`, `disconnected` (**unverified**).
-- New calls arrive as `InterfacesAdded` on the root ObjectManager. State changes arrive as
-  `PropertiesChanged` on the call object.
+- The root ObjectManager lists only the gateways. **Each `agN` is an ObjectManager for its own
+  calls**: list them with `GetManagedObjects` on `agN`, and new calls arrive as `InterfacesAdded`
+  from `agN` (verified with PipeWire 1.6.6). State changes arrive as `PropertiesChanged` on the
+  call object.
 - Related WirePlumber/PipeWire settings: `bluez5.hfphsp-backend`,
   `bluez5.telephony-dbus-service`, `bluez5.telephony.provide-ofono`,
   `bluez5.telephony.use-system-bus`, `bluez5.telephony.default-reject-sco`,

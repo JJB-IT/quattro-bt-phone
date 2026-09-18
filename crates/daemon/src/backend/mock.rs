@@ -464,10 +464,13 @@ fn contacts() -> Vec<Contact> {
                 .iter()
                 .map(|(label, number)| PhoneNumber { label: (*label).into(), number: (*number).into() })
                 .collect(),
-            photo: None,
+            photo: (*name == "Mum").then(|| MUM_PHOTO.into()),
         })
         .collect()
 }
+
+/// A 48×48 gradient, so the panel's photo path gets exercised.
+const MUM_PHOTO: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAAq1BMVEVBZYpEZopHaIlKaYlNaolRa4lTbIhXbohab4hecYhhcodkc4dfcYdldIdqdodtd4ZxeIZ3e4Z4e4V5fIVbcIh9fYWCf4WGgYSIgYRveIaMg4SNhISPhIOThoOXh4ODgISaiYOciYKgi4KijIKkjYKXiIOpj4GtkIGwkYGrkIG1lIC7loC0k4C9l4C/mH/BmH/Gmn/Im3/JnH/Pnn7ToH7WoX7Zon3do33jpnxuu/NyAAAC0klEQVRIx61W23KqQBDMgtwFBOUiCKISMBpFo8b8/5ed3gUUFS9Jnamy9KF7e3p2dsa3t/8QhHA8ghDyEpjnO6egrMdwDmhBlKoQRXC4BxTABUmSZVlhgR+SJHT4ewxSwhVFVVUNga+u8oACvAi4quoGDRMfXVdVUMRWBsHxgGu6YZq9KkzT0DVKETrkFo/juzgdaMuy+wjbssAx9FYGxQ9UDXDL6juO49JwnD44pqGpA6RFLvMXgKfHA+66nucjPA+cvsVEBpJw4YPvSDLwQ8t2KDoIR4gwoBzHtoZgyFKHv0hIVjTgcbznh1EUs4ii0PeoyNDQFFnscM2EFNUwgR/7AdBJMkEkCTiBPwbDNFSlkRTHEjJ7NvBhFCeT6SxFzKaTJKYijt0zWVJcQ0AzepbjAv9O4VmW51mWptPJOxiuY/WQ1EmClAJW3/UC4AHP5yzyLJ2BEXgukmISpC4RHEDA86MY+I/5fLFELD7nH2DEEZKCBFxUheIFuQsHEAjjZAr8YrlaF0WxWi7AmCZxCAm4QKH4uqa0RHAAgTQDfl1sttvNpgAjS5EUdYFCyeV1MwssoyCCQP65LDZfO8QXGJ85JOCC5TQoTXClBduhGc0gsAJ+fzjswVhBYsZysksTXOUZRWUWaEYQ2O2/j8fv/W6zXoIwKU3QwjLXjEA9+yMQPkDY7g7Hn5/jYbctlrA9iUf+fUJ+l2BeEIyagJTWlyndKJAb00VtujiZdhqmz2X1WVmpxKms85ayNi/uvby44uLi4vLi9NPFXbVGTlujqFojb7RGVxb41ubLz82XtzYfy6lu7+SF9r55QGn9gGbtD6jxRL22Jzq+fqK/HwKQeGnMkL8PsuejUr4aldfDuJrFjWHcMr7Zerg37sW2BfG7hdJcWXq1sbCzHqys81Lsnpeiory0R6/X7oNNzRa7eF7swpPF/vu/DjWJ0D8n3Evgp/EPTsGEVh9MhKgAAAAASUVORK5CYII=";
 
 fn recents() -> Vec<RecentCall> {
     let t = now();

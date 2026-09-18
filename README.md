@@ -7,8 +7,13 @@ kit. Calls go over your normal mobile number and plan. You talk through the lapt
 speakers and control everything from a native panel in the Omarchy bar. There's no VoIP, no
 cloud, and no app to install on the phone.
 
-> **Status: in early development.** The UI has been prototyped and the daemon is being built.
-> See the [roadmap](#roadmap). Not ready for daily use yet.
+> **Status: in early development.** The daemon, contact sync and Omarchy panel work; live-call
+> audio routing and recording are still being built. See the [roadmap](#roadmap). Not ready for
+> daily use yet.
+
+![The panel: dialer with a contact suggestion, contacts, an incoming call, and two calls with one on hold](docs/screenshots/panel.png)
+
+<sub>Screenshots use the daemon's `--mock` phone; every name and number is made up.</sub>
 
 ## Features
 
@@ -78,6 +83,23 @@ services.quattro-bt-phone = {
 Build with `cargo build --release`, install the two binaries, then
 `cp -r plugin ~/.config/omarchy/plugins/jjb.bt-phone` and
 `omarchy plugin enable jjb.bt-phone`. More detailed instructions will come with the first release.
+
+`omarchy plugin add <git url>` doesn't work for this repository: it expects `manifest.json` at
+the repository root, and the plugin lives in `plugin/` next to the daemon.
+
+### Trying the panel without a phone
+
+```sh
+cargo build
+target/debug/quattro-bt-phoned --mock &
+cp -r plugin ~/.config/omarchy/plugins/jjb.bt-phone
+omarchy plugin enable jjb.bt-phone
+target/debug/quattro-bt-phone simulate ring    # the panel opens with an incoming call
+```
+
+The panel finds the daemon at `$XDG_RUNTIME_DIR/quattro-bt-phone.sock`. Set `"socket"` in the
+plugin's entry in `~/.config/omarchy/shell.json` to use another path. Without a running daemon
+the panel shows "Service not running" and reconnects by itself when it starts.
 
 ## Usage
 

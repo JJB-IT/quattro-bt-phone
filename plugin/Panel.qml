@@ -34,6 +34,9 @@ Panel {
   readonly property bool muted: state ? state.audio.muted : false
   readonly property string route: state ? state.audio.route : "laptop"
   readonly property bool autoRecord: state ? state.settings.auto_record : false
+  // "" = the system default.
+  readonly property string audioOutput: state && state.settings.audio_output ? state.settings.audio_output : ""
+  readonly property string audioInput: state && state.settings.audio_input ? state.settings.audio_input : ""
   readonly property var contacts: daemonClient.contacts
   readonly property var recents: daemonClient.recents
   readonly property var recordings: daemonClient.recordings
@@ -56,6 +59,7 @@ Panel {
   property bool keypadOpen: false
   property string dtmf: ""
   property bool editing: false           // a text field has focus → key catcher steps aside
+  property bool settingsOpen: false      // call audio settings replace the body
   property string errorText: ""
 
   // ---- theme shorthands -------------------------------------------------
@@ -71,7 +75,7 @@ Panel {
     history: String.fromCodePoint(0xf02da), record: String.fromCodePoint(0xf044a), rec: String.fromCodePoint(0xf044b), mic: String.fromCodePoint(0xf036c), micOff: String.fromCodePoint(0xf036d),
     pause: String.fromCodePoint(0xf03e4), play: String.fromCodePoint(0xf040a), stop: String.fromCodePoint(0xf04db), swap: String.fromCodePoint(0xf04e1), backspace: String.fromCodePoint(0xf0b5c),
     laptop: String.fromCodePoint(0xf0322), search: String.fromCodePoint(0xf0349), close: String.fromCodePoint(0xf0156), folder: String.fromCodePoint(0xf0770), trash: String.fromCodePoint(0xf01b4),
-    refresh: String.fromCodePoint(0xf0450), chevronDown: String.fromCodePoint(0xf0140), chevronRight: String.fromCodePoint(0xf0142)
+    refresh: String.fromCodePoint(0xf0450), cog: String.fromCodePoint(0xf0493), chevronDown: String.fromCodePoint(0xf0140), chevronRight: String.fromCodePoint(0xf0142)
   })
 
   readonly property string statusText: {
@@ -143,6 +147,7 @@ Panel {
   }
   onPhaseChanged: {
     if (phase !== "incall") { keypadOpen = false; dtmf = "" }
+    if (phase === "ringing" || phase === "setup") settingsOpen = false
     if (phase === "idle" && _hadCall) tab = 2
     _hadCall = phase === "ringing" || phase === "incall"
   }
@@ -238,7 +243,7 @@ Panel {
             id: devLabels
             anchors.left: devIcon.right
             anchors.leftMargin: Style.space(12)
-            anchors.right: batt.left
+            anchors.right: gear.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
             Text {
@@ -261,6 +266,27 @@ Panel {
             }
           }
           Text {
+            id: gear
+            anchors.right: batt.visible ? batt.left : parent.right
+            anchors.rightMargin: batt.visible ? Style.space(10) : 0
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.phase === "idle" || root.inCall
+            width: visible ? implicitWidth : 0
+            text: root.icons.cog
+            color: root.settingsOpen ? root.accent : root.fg
+            opacity: root.settingsOpen || gearArea.containsMouse ? 1 : 0.6
+            font.family: root.font
+            font.pixelSize: Style.font.title
+            MouseArea {
+              id: gearArea
+              anchors.fill: parent
+              anchors.margins: -Style.space(6)
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.settingsOpen = !root.settingsOpen
+            }
+          }
+          Text {
             id: batt
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
@@ -278,7 +304,7 @@ Panel {
         // Tabs (hidden during a call)
         ButtonGroup {
           id: tabs
-          visible: root.phase === "idle"
+          visible: root.phase === "idle" && !root.settingsOpen
           width: parent.width
           spacing: Style.space(6)
           foreground: root.fg
@@ -304,27 +330,32 @@ Panel {
           DialerView {
             anchors.fill: parent
             app: root
-            visible: root.phase === "idle" && root.tab === 0
+            visible: root.phase === "idle" && root.tab === 0 && !root.settingsOpen
           }
           ContactsView {
             anchors.fill: parent
             app: root
-            visible: root.phase === "idle" && root.tab === 1
+            visible: root.phase === "idle" && root.tab === 1 && !root.settingsOpen
           }
           RecentsView {
             anchors.fill: parent
             app: root
-            visible: root.phase === "idle" && root.tab === 2
+            visible: root.phase === "idle" && root.tab === 2 && !root.settingsOpen
           }
           RecordingsView {
             anchors.fill: parent
             app: root
-            visible: root.phase === "idle" && root.tab === 3
+            visible: root.phase === "idle" && root.tab === 3 && !root.settingsOpen
           }
           CallView {
             anchors.fill: parent
             app: root
-            visible: root.phase === "ringing" || root.inCall
+            visible: root.phase === "ringing" || (root.inCall && !root.settingsOpen)
+          }
+          SettingsView {
+            anchors.fill: parent
+            app: root
+            visible: root.settingsOpen && (root.phase === "idle" || root.inCall)
           }
           SetupView {
             anchors.fill: parent

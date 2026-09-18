@@ -28,8 +28,10 @@ Every request has a `cmd`, plus an optional numeric `id` that is echoed back in 
 | `hangup_all` | | End every call |
 | `tones` | `digits` | Send DTMF (`0-9 * # A-D`) |
 | `hold` / `swap` | | Hold/resume; swap active and held |
-| `set_muted` | `muted` | Mute your microphone |
+| `set_muted` | `muted` | Mute your microphone (during a call; cleared when the calls end) |
 | `set_route` | `route`: `laptop`\|`phone` | Where call audio plays |
+| `get_audio_devices` | | → `audio_devices` |
+| `set_audio_device` | `direction`: `output`\|`input`, `name`? | Speakers/microphone for calls by `node.name`; no `name` = system default. Saved to config, applies during a call |
 | `sync` | | Re-pull contacts and history |
 | `get_contacts` | `query`? | → `contacts` |
 | `get_recents` | `missed_only`? | → `recents` |
@@ -43,6 +45,8 @@ Every request has a `cmd`, plus an optional numeric `id` that is echoed back in 
 
 Every message has a `type`.
 
+- **`audio_devices`**: `{"type":"audio_devices","outputs":[{"name":"alsa_output.pci-…","description":"Built-in Audio Analog Stereo"}],"inputs":[…]}`.
+  The phone's own call nodes are left out.
 - **`reply`**: `{"type":"reply","id":1,"ok":true}` or `{"type":"reply","ok":false,"error":"…"}`.
   Exactly one reply per request, sent after any data message the request produced.
 - **`state`**: the full state, flattened into the message:
@@ -64,13 +68,16 @@ Every message has a `type`.
     "audio": { "route": "laptop", "muted": false },
     "recording": { "call": "…", "path": "…", "started_at": 1789735201 },
     "sync": { "status": "idle", "error": null, "last_synced": 1789735000, "contacts": 1098, "history": 300 },
-    "settings": { "auto_record": false }
+    "settings": { "auto_record": false, "audio_output": null, "audio_input": "alsa_input.pci-…" }
   }
   ```
 
   `sync.status` goes `awaiting_approval` (the phone may be asking "Allow access to contacts?")
   → `syncing` → `idle`, or `error` with `sync.error` set. The daemon syncs again by itself
   whenever the phone connects, but only after a first sync that the user started has worked.
+
+  `settings.audio_output` / `audio_input` are PipeWire `node.name`s, or `null` for the system
+  default.
 
   Permissions (`calls`, `contacts`) are `unknown`, `requesting`, `granted` or `denied`.
   Call states follow oFono: `incoming`, `waiting`, `dialing`, `alerting`, `active`, `held`,

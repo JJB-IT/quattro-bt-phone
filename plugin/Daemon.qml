@@ -13,6 +13,7 @@ Item {
   property var contacts: []
   property var recents: []
   property var recordings: []
+  property var audioDevices: ({ outputs: [], inputs: [] })
   readonly property bool online: state !== null
 
   // A command the user started failed; the panel shows the message.
@@ -51,6 +52,8 @@ Item {
       recents = m.entries
     } else if (m.type === "recordings") {
       recordings = m.recordings
+    } else if (m.type === "audio_devices") {
+      audioDevices = { outputs: m.outputs, inputs: m.inputs }
     } else if (m.type === "reply" && m.id !== undefined) {
       var done = _pending[m.id]
       delete _pending[m.id]

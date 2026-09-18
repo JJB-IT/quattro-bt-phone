@@ -1,0 +1,18 @@
+# Nix
+result
+result-*
+.direnv/
+
+# Rust
+/target/
+
+# Python scratch
+__pycache__/
+*.pyc
+.venv/
+
+# Local-only notes and data (never commit personal device info or phone data)
+*.private.md
+/cache/
+*.vcf
+*.ogg

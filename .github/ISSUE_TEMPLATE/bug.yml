@@ -1,0 +1,28 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["type: bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`journalctl --user -u quattro-bt-phoned -b` and any QML errors from the shell log. Remove phone numbers and MAC addresses."
+      render: text
+  - type: input
+    id: phone
+    attributes:
+      label: Phone model and OS version
+      placeholder: e.g. Galaxy S25 FE, Android 16
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Output of `pipewire --version`, `wireplumber --version`, `bluetoothctl --version`, and your Omarchy version.
+      render: text

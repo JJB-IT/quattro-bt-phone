@@ -275,7 +275,7 @@ impl Real {
         for rc in &raw {
             let id = rc.path.to_string();
             let Some(state) = CallState::from_ofono(&rc.state) else {
-                tracing::debug!(state = %rc.state, "unknown call state");
+                tracing::info!(state = %rc.state, "unknown call state");
                 continue;
             };
             let t = self.tracked.entry(id.clone()).or_insert_with(|| {
@@ -306,6 +306,9 @@ impl Real {
                 if let Some((name, label)) = lookup(&self.store, &t.number) {
                     (t.name, t.label) = (Some(name), Some(label));
                 }
+            }
+            if t.last_state != state {
+                tracing::info!(from = ?t.last_state, to = ?state, "call state changed");
             }
             t.last_state = state;
             calls.push(Call {

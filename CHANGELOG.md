@@ -14,7 +14,7 @@ All notable changes to this project are documented here. The format follows
 - Contact and call-history cache in SQLite, one database per phone, with a vCard 2.1/3.0
   parser for PBAP data. Callers are named from the phonebook, and recents merge the phone's
   history with calls the daemon saw itself. Contact search ignores accents.
-- Read-only PBAP sync of contacts and call history through obexd, started with
+- Read-only PBAP sync of contacts (with photos) and call history through obexd, started with
   `request_contacts`/`sync` and repeated whenever the phone reconnects after a first
   approved sync.
 - Omarchy plugin `jjb.bt-phone`: a bar button and panel with dialer (contact suggestions as

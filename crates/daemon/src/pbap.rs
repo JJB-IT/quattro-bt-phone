@@ -26,6 +26,8 @@ const TRANSFER: &str = "org.bluez.obex.Transfer1";
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(60);
 /// A phonebook with a thousand photos takes a while over Bluetooth.
 const TRANSFER_TIMEOUT: Duration = Duration::from_secs(300);
+/// The vCard properties the parser reads (obexd's names).
+const FIELDS: &[&str] = &["VERSION", "FN", "N", "ORG", "TEL", "PHOTO", "X-IRMC-CALL-DATETIME"];
 /// Safety net in case a Transfer1 signal is missed.
 const TRANSFER_POLL: Duration = Duration::from_millis(500);
 
@@ -121,7 +123,8 @@ async fn pull_book(conn: &Connection, session: &OwnedObjectPath, book: &str) -> 
     let mut changes = MessageStream::for_match_rule(rule, conn, Some(16)).await?;
 
     // An empty target lets obexd pick a private temporary file; it reports the name back.
-    let filters: HashMap<&str, Value> = HashMap::new();
+    // Name the fields: with an empty filter, Android (tested: Galaxy S25 FE) leaves photos out.
+    let filters: HashMap<&str, Value> = HashMap::from([("Fields", Value::from(FIELDS.to_vec()))]);
     let reply =
         conn.call_method(Some(SERVICE), session.as_str(), Some(PHONEBOOK), "PullAll", &("", filters)).await?;
     let (transfer, props): (OwnedObjectPath, Props) = reply.body().deserialize()?;

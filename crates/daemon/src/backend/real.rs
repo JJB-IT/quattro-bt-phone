@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, watch};
 use zbus::Connection;
 
 use super::{Job, Outcome, now, publish, validate_dial, validate_tones};
-use crate::audio::{Devices, Router};
+use crate::audio::{self, Devices, Router};
 use crate::bluez::{self, BtDevice};
 use crate::config::Config;
 use crate::notify::{self, Notifier, Urgency};
@@ -99,7 +99,14 @@ pub async fn run(
 
     let mut real = Real {
         notifier: Notifier::new(session.clone(), config.notifications()),
-        state: State { settings: Settings { auto_record: config.auto_record }, ..Default::default() },
+        state: State {
+            settings: Settings {
+                auto_record: config.auto_record,
+                audio_output: config.audio_output.clone(),
+                audio_input: config.audio_input.clone(),
+            },
+            ..Default::default()
+        },
         system,
         session,
         config,
@@ -409,12 +416,17 @@ impl Real {
         match live {
             Some(address) => {
                 let devices = Devices {
-                    output: self.config.audio_output.as_deref(),
-                    input: self.config.audio_input.as_deref(),
+                    output: self.config.audio_output.clone(),
+                    input: self.config.audio_input.clone(),
                 };
                 self.audio.start(&address, devices).await
             }
             None => self.audio.stop().await,
+        }
+        // Mute belongs to a call; the next one starts unmuted.
+        if self.state.calls.is_empty() && self.state.audio.muted {
+            self.state.audio.muted = false;
+            let _ = self.audio.set_muted(false).await;
         }
     }
 
@@ -635,8 +647,26 @@ impl Real {
             Command::SetRoute { route: AudioRoute::Phone } => {
                 bail!("moving call audio back to the phone is not supported yet (#2)")
             }
-            Command::SetMuted { .. } => {
-                bail!("mute is not implemented yet: it needs the audio routing from #3")
+            Command::SetMuted { muted } => {
+                anyhow::ensure!(!self.state.calls.is_empty(), "no call");
+                self.audio.set_muted(muted).await?;
+                self.state.audio.muted = muted;
+            }
+            Command::GetAudioDevices => {
+                let phone = self.config.phone.clone().unwrap_or_default();
+                let (outputs, inputs) = audio::devices(&phone).await?;
+                return Ok(Some(Message::AudioDevices { outputs, inputs }));
+            }
+            Command::SetAudioDevice { direction, name } => {
+                match direction {
+                    AudioDirection::Output => self.config.audio_output = name.clone(),
+                    AudioDirection::Input => self.config.audio_input = name.clone(),
+                }
+                self.state.settings.audio_output = self.config.audio_output.clone();
+                self.state.settings.audio_input = self.config.audio_input.clone();
+                self.save_config();
+                // A running call bridge picks the new device up on the next routing pass.
+                self.route_audio().await;
             }
 
             Command::GetContacts { query } => {

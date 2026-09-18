@@ -90,6 +90,15 @@ pub enum Command {
     SetRoute {
         route: AudioRoute,
     },
+    /// The speakers and microphones calls can use.
+    GetAudioDevices,
+    /// Use this device for calls (a `node.name` from `get_audio_devices`), or the system
+    /// default when `name` is omitted. Applies at once, also during a call.
+    SetAudioDevice {
+        direction: AudioDirection,
+        #[serde(default)]
+        name: Option<String>,
+    },
 
     /// Re-pull contacts and call history from the phone.
     Sync,
@@ -156,6 +165,10 @@ pub enum Message {
     },
     Recordings {
         recordings: Vec<Recording>,
+    },
+    AudioDevices {
+        outputs: Vec<AudioDevice>,
+        inputs: Vec<AudioDevice>,
     },
     Reply {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -371,6 +384,27 @@ pub enum SyncStatus {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
     pub auto_record: bool,
+    /// `node.name` of the speakers for calls; `None` = the system default.
+    #[serde(default)]
+    pub audio_output: Option<String>,
+    /// `node.name` of the microphone for calls; `None` = the system default.
+    #[serde(default)]
+    pub audio_input: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioDirection {
+    Output,
+    Input,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AudioDevice {
+    /// PipeWire `node.name`, stable across restarts.
+    pub name: String,
+    /// What to show, e.g. "Built-in Audio Analog Stereo".
+    pub description: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

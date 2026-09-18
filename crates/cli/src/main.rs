@@ -5,7 +5,7 @@ use std::os::unix::net::UnixStream;
 
 use anyhow::{Context, bail};
 use clap::{Parser, Subcommand, ValueEnum};
-use qbp_proto::{AudioRoute, Command, Message, Request, SimEvent, State};
+use qbp_proto::{AudioDirection, AudioRoute, Command, Message, Request, SimEvent, State};
 
 /// Control phone calls through quattro-bt-phoned.
 #[derive(Parser, Debug)]
@@ -49,9 +49,14 @@ enum Cmd {
     Route { to: Route },
     /// Mute or unmute your microphone.
     Mute {
-        #[arg(value_parser = clap::builder::BoolishValueParser::new())]
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
         on: bool,
     },
+    /// List the speakers and microphones calls can use.
+    AudioDevices,
+    /// Use a speaker or microphone for calls (a name from `audio-devices`); no name = the
+    /// system default.
+    AudioDevice { direction: Direction, name: Option<String> },
     /// Refresh contacts and call history from the phone.
     Sync,
     /// Search contacts.
@@ -71,7 +76,7 @@ enum Cmd {
     AllowContacts,
     /// Turn automatic call recording on or off.
     AutoRecord {
-        #[arg(value_parser = clap::builder::BoolishValueParser::new())]
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
         on: bool,
     },
     /// Simulate phone events (daemon must run with --mock).
@@ -82,6 +87,12 @@ enum Cmd {
 enum Route {
     Laptop,
     Phone,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+enum Direction {
+    Output,
+    Input,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -116,6 +127,14 @@ fn main() -> anyhow::Result<()> {
             },
         },
         Cmd::Mute { on } => Command::SetMuted { muted: on },
+        Cmd::AudioDevices => Command::GetAudioDevices,
+        Cmd::AudioDevice { direction, name } => Command::SetAudioDevice {
+            direction: match direction {
+                Direction::Output => AudioDirection::Output,
+                Direction::Input => AudioDirection::Input,
+            },
+            name,
+        },
         Cmd::Sync => Command::Sync,
         Cmd::Contacts { query } => Command::GetContacts { query },
         Cmd::Recents { missed } => Command::GetRecents { missed_only: missed },
@@ -169,6 +188,14 @@ fn main() -> anyhow::Result<()> {
                     println!("{:<9} {:<28} {dur}", format!("{:?}", r.kind).to_lowercase(), who);
                 }
             }
+            Message::AudioDevices { outputs, inputs } => {
+                for (title, list) in [("Outputs", outputs), ("Inputs", inputs)] {
+                    println!("{title}:");
+                    for d in list {
+                        println!("  {:<40} {}", d.description, d.name);
+                    }
+                }
+            }
             Message::Recordings { recordings } => {
                 for r in recordings {
                     println!("{}  {}", r.path, r.name.unwrap_or(r.number));
@@ -213,7 +240,32 @@ fn print_state(s: &State) {
         let who = c.name.clone().unwrap_or_else(|| c.number.clone());
         println!("call:     {:?} {:?} {who}", c.state, c.direction);
     }
+    if !s.calls.is_empty() {
+        println!("audio:    {:?}{}", s.audio.route, if s.audio.muted { ", muted" } else { "" });
+    }
+    let default = || "system default".to_string();
+    println!(
+        "devices:  output {}, input {}",
+        s.settings.audio_output.clone().unwrap_or_else(default),
+        s.settings.audio_input.clone().unwrap_or_else(default)
+    );
     if let Some(r) = &s.recording {
         println!("recording {}", r.path);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    use super::*;
+
+    #[test]
+    fn arguments_are_well_formed() {
+        Args::command().debug_assert();
+        let args = Args::try_parse_from(["quattro-bt-phone", "mute", "on"]).unwrap();
+        assert!(matches!(args.cmd, Cmd::Mute { on: true }));
+        let args = Args::try_parse_from(["quattro-bt-phone", "auto-record", "off"]).unwrap();
+        assert!(matches!(args.cmd, Cmd::AutoRecord { on: false }));
     }
 }

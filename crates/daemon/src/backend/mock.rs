@@ -81,7 +81,7 @@ fn ready_state(auto_record: bool) -> State {
         },
         devices: devices(),
         sync: SyncInfo { last_synced: Some(now() - 600), contacts: 38, history: 11, ..Default::default() },
-        settings: Settings { auto_record },
+        settings: Settings { auto_record, ..Default::default() },
         ..Default::default()
     }
 }
@@ -323,6 +323,26 @@ impl Mock {
                 }
             }
             Command::SetMuted { muted } => self.state.audio.muted = muted,
+            Command::GetAudioDevices => {
+                let d = |name: &str, description: &str| AudioDevice {
+                    name: name.into(),
+                    description: description.into(),
+                };
+                return Ok(Some(Message::AudioDevices {
+                    outputs: vec![
+                        d("mock_output.speakers", "Laptop speakers (mock)"),
+                        d("mock_output.headset", "Headset (mock)"),
+                    ],
+                    inputs: vec![
+                        d("mock_input.mic", "Laptop microphone (mock)"),
+                        d("mock_input.headset", "Headset mic (mock)"),
+                    ],
+                }));
+            }
+            Command::SetAudioDevice { direction, name } => match direction {
+                AudioDirection::Output => self.state.settings.audio_output = name,
+                AudioDirection::Input => self.state.settings.audio_input = name,
+            },
             Command::SetRoute { route } => {
                 self.state.audio.route = route;
                 if route == AudioRoute::Phone {
@@ -400,7 +420,7 @@ impl Mock {
                     let auto = self.state.settings.auto_record;
                     self.state = State {
                         devices: devices(),
-                        settings: Settings { auto_record: auto },
+                        settings: Settings { auto_record: auto, ..self.state.settings.clone() },
                         ..Default::default()
                     };
                 }

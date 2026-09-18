@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `quattro-bt-phone mute on|off` and `auto-record on|off` crashed on start.
+
 ### Added
 - `quattro-bt-phoned` daemon: tracks the phone over BlueZ and calls over PipeWire Telephony,
   with ring and missed-call notifications and a JSON-lines socket API (`docs/protocol.md`).
@@ -24,6 +27,9 @@ All notable changes to this project are documented here. The format follows
   reconnects when the daemon restarts. It uses only the shell's theme tokens.
 - Call audio: while a call's audio is on the computer, the daemon bridges it to the speakers
   and microphone (system default, or `audio_output`/`audio_input` in the config).
+- Choose the speakers and microphone for calls in the panel (gear icon) or with
+  `quattro-bt-phone audio-devices` / `audio-device`; the change applies during a call too.
+- Mute on real calls: it stops the microphone bridge to the phone.
 - `quattro-bt-phone` CLI. `dial` asks for confirmation unless `--yes` is given.
 - Project documentation, research notes and repository workflow.
 - Contribution guide aligned with Omarchy's style, theming and commit conventions.

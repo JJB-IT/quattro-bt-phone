@@ -114,13 +114,15 @@ quattro-bt-phone sync            # refresh contacts and call history from the ph
 ```
 
 During a call the daemon connects the phone's audio to your default speakers and microphone.
-To use other devices, set their PipeWire node names (`wpctl status`, then `wpctl inspect <id>`
-for `node.name`) in `~/.config/quattro-bt-phone/config.toml` and restart the daemon:
+Pick other devices with the gear icon in the panel, or from the command line:
 
-```toml
-audio_output = "alsa_output.pci-0000_00_1f.3.analog-stereo"
-audio_input = "alsa_input.pci-0000_00_1f.3.analog-stereo"
+```sh
+quattro-bt-phone audio-devices                     # names and descriptions
+quattro-bt-phone audio-device output alsa_output.pci-0000_00_1f.3.analog-stereo
+quattro-bt-phone audio-device input                # back to the system default
 ```
+
+The choice is saved as `audio_output` / `audio_input` in `~/.config/quattro-bt-phone/config.toml`.
 
 ## Call recording and the law
 

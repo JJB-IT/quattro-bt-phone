@@ -109,7 +109,10 @@ Item {
           subCaption: modelData[1]
           glyphIsText: true
           size: Style.space(56)
-          onClicked: app.dialled += modelData[0]
+          onClicked: {
+            app.dialled += modelData[0]
+            app.keySound(modelData[0], false)
+          }
         }
       }
     }

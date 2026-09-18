@@ -37,6 +37,7 @@ Panel {
   // "" = the system default.
   readonly property string audioOutput: state && state.settings.audio_output ? state.settings.audio_output : ""
   readonly property string audioInput: state && state.settings.audio_input ? state.settings.audio_input : ""
+  readonly property bool keypadSounds: state ? !!state.settings.keypad_sounds : false
   readonly property var contacts: daemonClient.contacts
   readonly property var recents: daemonClient.recents
   readonly property var recordings: daemonClient.recordings
@@ -100,6 +101,10 @@ Panel {
       if (ok) root.dialled = ""
       else root.showError(error)
     })
+  }
+  // The daemon plays it: a DTMF tone for a clicked key, a soft tick for a typed one.
+  function keySound(key, soft) {
+    if (keypadSounds) daemonClient.send("play_key_sound", { key: key, soft: soft })
   }
   function sendTone(digit) {
     dtmf += digit
@@ -210,9 +215,12 @@ Panel {
       onTextKey: function(t) {
         if (!/^[0-9*#+]$/.test(t)) return
         if (root.inCall && root.keypadOpen) root.sendTone(t)
-        else if (root.phase === "idle" && root.tab === 0) root.dialled += t
+        else if (root.phase === "idle" && root.tab === 0 && !root.settingsOpen) {
+          root.dialled += t
+          root.keySound(t, true)
+        }
       }
-      onDeleteRequested: if (root.phase === "idle" && root.tab === 0) root.dialled = root.dialled.slice(0, -1)
+      onDeleteRequested: if (root.phase === "idle" && root.tab === 0 && !root.settingsOpen) root.dialled = root.dialled.slice(0, -1)
       // Enter never answers: the panel opens by itself on a ring and takes keyboard focus, so a
       // stray Enter typed into another window would pick up the call.
       onActivateRequested: if (root.phase === "idle" && root.tab === 0 && root.dialled.length > 0) root.dial(root.dialled)

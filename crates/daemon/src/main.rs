@@ -8,6 +8,7 @@ mod pbap;
 mod server;
 mod store;
 mod telephony;
+mod tones;
 mod vcard;
 
 use std::path::PathBuf;

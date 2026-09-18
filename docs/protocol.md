@@ -37,6 +37,8 @@ Every request has a `cmd`, plus an optional numeric `id` that is echoed back in 
 | `get_recents` | `missed_only`? | → `recents` |
 | `get_recordings` | | → `recordings` |
 | `set_auto_record` | `enabled` | Saved to config |
+| `set_keypad_sounds` | `enabled` | Saved to config |
+| `play_key_sound` | `key`, `soft`? | A key's DTMF tone, or a soft tick for a typed key (`soft`); nothing while keypad sounds are off |
 | `start_recording` / `stop_recording` | `discard`? | Manual recording control |
 | `delete_recording` | `id` | Delete a recording file |
 | `simulate` | `event`, `number`? | `--mock` only: `ring`, `remote_answer`, `remote_hangup`, `disconnect`, `reset_setup` |
@@ -68,7 +70,7 @@ Every message has a `type`.
     "audio": { "route": "laptop", "muted": false },
     "recording": { "call": "…", "path": "…", "started_at": 1789735201 },
     "sync": { "status": "idle", "error": null, "last_synced": 1789735000, "contacts": 1098, "history": 300 },
-    "settings": { "auto_record": false, "audio_output": null, "audio_input": "alsa_input.pci-…" }
+    "settings": { "auto_record": false, "audio_output": null, "audio_input": "alsa_input.pci-…", "keypad_sounds": true }
   }
   ```
 

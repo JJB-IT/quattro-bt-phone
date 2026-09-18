@@ -30,6 +30,8 @@ All notable changes to this project are documented here. The format follows
 - Choose the speakers and microphone for calls in the panel (gear icon) or with
   `quattro-bt-phone audio-devices` / `audio-device`; the change applies during a call too.
 - Mute on real calls: it stops the microphone bridge to the phone.
+- Keypad sounds (off by default, in the panel's settings or `quattro-bt-phone keypad-sounds on`):
+  a DTMF tone for each clicked dialer key and a soft tick for typed digits.
 - `quattro-bt-phone` CLI. `dial` asks for confirmation unless `--yes` is given.
 - Project documentation, research notes and repository workflow.
 - Contribution guide aligned with Omarchy's style, theming and commit conventions.

@@ -79,6 +79,11 @@ enum Cmd {
         #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
         on: bool,
     },
+    /// Turn the dialling tones on or off.
+    KeypadSounds {
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
+        on: bool,
+    },
     /// Simulate phone events (daemon must run with --mock).
     Simulate { event: Sim, number: Option<String> },
 }
@@ -143,6 +148,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::AllowCalls => Command::RequestCalls,
         Cmd::AllowContacts => Command::RequestContacts,
         Cmd::AutoRecord { on } => Command::SetAutoRecord { enabled: on },
+        Cmd::KeypadSounds { on } => Command::SetKeypadSounds { enabled: on },
         Cmd::Simulate { event, number } => Command::Simulate {
             event: match event {
                 Sim::Ring => SimEvent::Ring,

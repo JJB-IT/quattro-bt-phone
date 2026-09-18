@@ -394,10 +394,9 @@ impl Real {
         if transport.as_deref() != Some("active")
             && let Some(gw) = self.gateway.clone()
         {
+            // The phone refuses (CME "operation not allowed") until the call is connected.
             let wanted = self.tracked.values_mut().find(|t| {
-                t.on_computer
-                    && matches!(t.last_state, CallState::Alerting | CallState::Active)
-                    && t.audio_requested != Some(t.last_state)
+                t.on_computer && t.last_state == CallState::Active && t.audio_requested != Some(t.last_state)
             });
             if let Some(t) = wanted {
                 t.audio_requested = Some(t.last_state);
@@ -639,6 +638,10 @@ impl Real {
             }
             Command::Hold | Command::Swap => telephony::swap_calls(&self.session, self.gateway()?).await?,
             Command::SetRoute { route: AudioRoute::Laptop } => {
+                anyhow::ensure!(
+                    self.state.calls.iter().any(|c| c.state == CallState::Active),
+                    "the phone hands over call audio once the call is connected"
+                );
                 telephony::activate_audio(&self.session, self.gateway()?).await?;
                 for t in self.tracked.values_mut() {
                     t.on_computer = true;

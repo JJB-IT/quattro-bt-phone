@@ -113,11 +113,11 @@ Panel {
 
   // A contact photo for the caller, when the number is in the phonebook.
   function photoFor(number) {
-    var d = Format.digits(number)
-    if (d.length < 3) return ""
+    var key = Format.matchKey(number)
+    if (key.length < 3) return ""
     for (var i = 0; i < contacts.length; i++)
       for (var j = 0; j < contacts[i].numbers.length; j++)
-        if (Format.digits(contacts[i].numbers[j].number) === d) return contacts[i].photo || ""
+        if (Format.matchKey(contacts[i].numbers[j].number) === key) return contacts[i].photo || ""
     return ""
   }
 

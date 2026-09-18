@@ -35,6 +35,15 @@ function initials(name) {
 
 function digits(s) { return String(s || "").replace(/[^0-9+*#]/g, "") }
 
+// Mirrors match_key() in the daemon's store: the last nine digits, so "+31 6 1234 5678" matches
+// "06-12345678". Short numbers and service codes must match exactly.
+function matchKey(number) {
+  var n = digits(number)
+  var d = n.replace(/[^0-9]/g, "")
+  if (/[*#]/.test(n) || d.length < 9) return n.replace(/^\+/, "")
+  return d.slice(-9)
+}
+
 // Lower case without accents, like the daemon's search.
 function fold(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() }
 
@@ -63,16 +72,20 @@ function contactsWithHeaders(contacts, query) {
   })
 }
 
-// Contact numbers containing the dialled digits, for the dialer suggestion.
+// Contact numbers containing the dialled digits, for the dialer suggestion. A leading trunk "0"
+// is optional, so "0612" finds "+31 6 12…".
 function matchNumber(contacts, dialled) {
   var d = digits(dialled).replace(/^\+/, "")
   if (d.length < 3) return []
+  var national = d.charAt(0) === "0" ? d.replace(/^0+/, "") : ""
   var out = []
   for (var i = 0; i < contacts.length && out.length < 2; i++) {
     var c = contacts[i]
-    for (var j = 0; j < c.numbers.length; j++)
-      if (digits(c.numbers[j].number).indexOf(d) >= 0)
+    for (var j = 0; j < c.numbers.length; j++) {
+      var n = digits(c.numbers[j].number)
+      if (n.indexOf(d) >= 0 || (national.length >= 3 && n.indexOf(national) >= 0))
         out.push({ name: c.name, label: c.numbers[j].label, number: c.numbers[j].number, photo: c.photo || "" })
+    }
   }
   return out.slice(0, 2)
 }

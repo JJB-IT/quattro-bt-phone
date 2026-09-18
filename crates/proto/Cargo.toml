@@ -1,0 +1,16 @@
+[package]
+name = "qbp-proto"
+description = "Socket protocol shared by quattro-bt-phoned and its clients"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

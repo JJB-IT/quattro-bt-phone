@@ -10,6 +10,12 @@ Item {
   readonly property bool ringing: app.phase === "ringing"
   readonly property var who: app.call || ({})
   readonly property bool twoCalls: app.calls.length > 1
+  // The call that isn't on screen: held, or still active while another one waits.
+  readonly property var other: {
+    for (var i = 0; i < app.calls.length; i++)
+      if (app.calls[i].id !== who.id) return app.calls[i]
+    return null
+  }
 
   // Status strip: recording + audio route (in call only)
   Item {
@@ -68,12 +74,14 @@ Item {
     id: identity
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: parent.top
-    anchors.topMargin: root.ringing ? Style.space(50) : Style.space(46)
+    anchors.topMargin: root.ringing ? Style.space(50) : app.keypadOpen ? Style.space(36) : Style.space(46)
     spacing: Style.space(6)
 
+    // Smaller with a second call, and out of the way of the DTMF keypad.
     Item {
       anchors.horizontalCenter: parent.horizontalCenter
-      width: Style.space(84); height: width
+      visible: root.ringing || !app.keypadOpen
+      width: root.other && !root.ringing ? Style.space(56) : Style.space(84); height: width
 
       // Ripple while ringing
       BorderSurface {
@@ -114,6 +122,15 @@ Item {
       opacity: root.ringing ? 1 : 0.85
       font.family: app.font
       font.pixelSize: root.ringing ? Style.font.body : Style.font.heading
+      topPadding: Style.space(4)
+    }
+    Text {
+      anchors.horizontalCenter: parent.horizontalCenter
+      visible: !!root.other
+      text: !root.other ? ""
+        : root.other.state === "held" ? app.icons.pause + " " + (root.other.name || root.other.number) + " · on hold"
+        : app.icons.inTalk + " " + (root.other.name || root.other.number) + " · in call"
+      color: app.fg; opacity: 0.6; font.family: app.font; font.pixelSize: Style.font.bodySmall
       topPadding: Style.space(4)
     }
   }
@@ -171,6 +188,7 @@ Item {
         app: root.app
         glyph: app.icons.dialpad
         caption: "Keypad"
+        enabled: !app.held
         onClicked: app.keypadOpen = true
       }
       CallButton {
@@ -193,7 +211,7 @@ Item {
         caption: app.recording ? "Stop rec" : "Record"
         tint: app.urgent
         checked: app.recording
-        enabled: app.route === "laptop"
+        enabled: app.route === "laptop" && (app.recording || !app.held)
         onClicked: app.daemon.act(app.recording ? "stop_recording" : "start_recording")
       }
       CallButton {

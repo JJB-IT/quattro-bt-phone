@@ -147,6 +147,9 @@ Panel {
     _hadCall = phase === "ringing" || phase === "incall"
   }
   property bool _hadCall: false
+  // Digits sent to one call don't belong to the next.
+  readonly property string callId: call ? call.id : ""
+  onCallIdChanged: dtmf = ""
 
   // ---- bar icon ---------------------------------------------------------
   readonly property string barText: {

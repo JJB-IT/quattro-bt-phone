@@ -16,6 +16,10 @@ pub struct Config {
     pub recordings_dir: Option<PathBuf>,
     /// Show desktop notifications for incoming and missed calls.
     pub notifications: Option<bool>,
+    /// PipeWire `node.name` of the speakers or headset for calls. Unset: the system default.
+    pub audio_output: Option<String>,
+    /// PipeWire `node.name` of the microphone for calls. Unset: the system default.
+    pub audio_input: Option<String>,
 }
 
 impl Config {

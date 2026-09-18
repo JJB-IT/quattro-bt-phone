@@ -113,6 +113,15 @@ quattro-bt-phone tones 1234#
 quattro-bt-phone sync            # refresh contacts and call history from the phone
 ```
 
+During a call the daemon connects the phone's audio to your default speakers and microphone.
+To use other devices, set their PipeWire node names (`wpctl status`, then `wpctl inspect <id>`
+for `node.name`) in `~/.config/quattro-bt-phone/config.toml` and restart the daemon:
+
+```toml
+audio_output = "alsa_output.pci-0000_00_1f.3.analog-stereo"
+audio_input = "alsa_input.pci-0000_00_1f.3.analog-stereo"
+```
+
 ## Call recording and the law
 
 Recording laws differ by country and state. Some places require **everyone on the call** to
@@ -126,7 +135,8 @@ Progress is tracked in [milestones](https://github.com/JJB-IT/quattro-bt-phone/m
 1. Live-call spike: confirm call states and audio node behaviour on real hardware.
 2. Daemon core: call tracking, socket API, CLI, notifications.
 3. PBAP sync: contacts and call history cache, caller names.
-4. Omarchy plugin: bar widget, panel, in-call view.
+4. Omarchy plugin: bar widget, panel, in-call view, and a picker for the call microphone and
+   speakers.
 5. Call recording.
 6. Packaging: Nix flake and home-manager module, first release.
 

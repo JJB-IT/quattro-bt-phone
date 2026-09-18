@@ -105,7 +105,6 @@ impl Store {
 
     /// Replace every cached contact. Cards without a name or number are skipped: the owner's
     /// own card that PBAP puts first usually looks like that.
-    #[allow(dead_code)] // Called by the PBAP sync (#8).
     pub fn replace_contacts(&mut self, cards: &[Card]) -> anyhow::Result<u32> {
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM contacts", [])?;
@@ -130,7 +129,6 @@ impl Store {
     }
 
     /// Replace the phone's call history. Cards without a call timestamp are skipped.
-    #[allow(dead_code)] // Called by the PBAP sync (#8).
     pub fn replace_history(&mut self, cards: &[Card]) -> anyhow::Result<u32> {
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM history", [])?;
@@ -150,7 +148,6 @@ impl Store {
         Ok(count)
     }
 
-    #[allow(dead_code)] // Called by the PBAP sync (#8).
     pub fn set_last_synced(&self, at: i64) -> anyhow::Result<()> {
         self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_synced', ?1)", [at])?;
         Ok(())

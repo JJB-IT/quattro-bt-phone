@@ -18,6 +18,7 @@ use super::{Job, Outcome, now, publish, validate_dial, validate_tones};
 use crate::bluez::{self, BtDevice};
 use crate::config::Config;
 use crate::notify::{self, Notifier, Urgency};
+use crate::pbap;
 use crate::store::Store;
 use crate::telephony::{self, Gateway, RawCall};
 
@@ -32,6 +33,10 @@ const RECENTS_LIMIT: usize = 200;
 enum Done {
     Connect(anyhow::Result<()>),
     RequestCalls(anyhow::Result<()>),
+    /// The phone accepted the PBAP session; the transfers are running.
+    SyncApproved,
+    /// The result, for the phone with this address.
+    Sync(String, Result<pbap::Pulled, pbap::Error>),
 }
 
 struct Tracked {
@@ -59,6 +64,9 @@ pub struct Real {
     calls_requested: Option<Instant>,
     calls_denied: bool,
     connecting: bool,
+    syncing: bool,
+    /// Whether the phone was connected at the last refresh, to notice it (re)connecting.
+    was_connected: bool,
     done: mpsc::Sender<Done>,
 }
 
@@ -90,6 +98,8 @@ pub async fn run(
         calls_requested: None,
         calls_denied: false,
         connecting: false,
+        syncing: false,
+        was_connected: false,
         done,
     };
     real.refresh().await;
@@ -182,6 +192,63 @@ impl Real {
 
         let raw = self.gateway.as_ref().map(|g| g.calls.clone()).unwrap_or_default();
         self.track_calls(raw).await;
+
+        let connected = self.state.phone.connected;
+        if connected && !self.was_connected {
+            self.sync_on_connect();
+        }
+        self.was_connected = connected;
+    }
+
+    /// Refresh the cache whenever the phone connects, but only once the user has allowed
+    /// access before: an automatic sync must never be what pops a prompt on the phone.
+    fn sync_on_connect(&mut self) {
+        let allowed_before = self.store.as_ref().is_some_and(|_| self.state.sync.last_synced.is_some());
+        if allowed_before && let Err(e) = self.start_sync() {
+            tracing::warn!("sync on connect: {e:#}");
+        }
+    }
+
+    fn start_sync(&mut self) -> anyhow::Result<()> {
+        let d = self.phone_device().cloned().ok_or_else(|| anyhow!("no phone selected"))?;
+        anyhow::ensure!(d.connected, "{} is not connected", d.name);
+        if self.syncing {
+            return Ok(());
+        }
+        self.syncing = true;
+        let sync = &mut self.state.sync;
+        (sync.status, sync.error) = (SyncStatus::AwaitingApproval, None);
+        if self.state.phone.contacts != Permission::Granted {
+            self.state.phone.contacts = Permission::Requesting;
+        }
+        tracing::info!("syncing contacts and call history");
+
+        let (conn, done) = (self.session.clone(), self.done.clone());
+        tokio::spawn(async move {
+            let approved = done.clone();
+            let r = pbap::pull(&conn, &d.address, move || {
+                let _ = approved.try_send(Done::SyncApproved);
+            })
+            .await;
+            let _ = done.send(Done::Sync(d.address, r)).await;
+        });
+        Ok(())
+    }
+
+    fn finish_sync(&mut self, address: &str, pulled: pbap::Pulled) -> anyhow::Result<()> {
+        let store = match &mut self.store {
+            Some((a, store)) if a.eq_ignore_ascii_case(address) => store,
+            _ => bail!("another phone was selected during the sync"),
+        };
+        let contacts = store.replace_contacts(&pulled.contacts)?;
+        let history = match &pulled.history {
+            Some(h) => Some(store.replace_history(h)?),
+            None => None,
+        };
+        store.set_last_synced(now())?;
+        tracing::info!(contacts, ?history, "sync finished");
+        self.update_sync_counts();
+        Ok(())
     }
 
     /// With exactly one paired phone and nothing configured, use it: that's the common case.
@@ -361,6 +428,30 @@ impl Real {
                     self.calls_denied = true;
                 }
             }
+            Done::SyncApproved => {
+                self.state.phone.contacts = Permission::Granted;
+                self.state.sync.status = SyncStatus::Syncing;
+            }
+            Done::Sync(address, r) => {
+                self.syncing = false;
+                let r = match r {
+                    Ok(pulled) => self.finish_sync(&address, pulled),
+                    Err(e) => {
+                        if matches!(e, pbap::Error::NotAllowed(_)) {
+                            self.state.phone.contacts = Permission::Denied;
+                        }
+                        Err(anyhow!("{e}"))
+                    }
+                };
+                let sync = &mut self.state.sync;
+                match r {
+                    Ok(()) => (sync.status, sync.error) = (SyncStatus::Idle, None),
+                    Err(e) => {
+                        tracing::warn!("sync failed: {e:#}");
+                        (sync.status, sync.error) = (SyncStatus::Error, Some(format!("{e:#}")));
+                    }
+                }
+            }
         }
     }
 
@@ -427,7 +518,7 @@ impl Real {
                     let _ = done.send(Done::RequestCalls(r)).await;
                 });
             }
-            Command::RequestContacts | Command::Sync => bail!("contact sync is not implemented yet (#8)"),
+            Command::RequestContacts | Command::Sync => self.start_sync()?,
 
             Command::Dial { number } => {
                 let number = validate_dial(&number)?;

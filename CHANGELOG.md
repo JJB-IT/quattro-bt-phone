@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
 - Contact and call-history cache in SQLite, one database per phone, with a vCard 2.1/3.0
   parser for PBAP data. Callers are named from the phonebook, and recents merge the phone's
   history with calls the daemon saw itself. Contact search ignores accents.
+- Read-only PBAP sync of contacts and call history through obexd, started with
+  `request_contacts`/`sync` and repeated whenever the phone reconnects after a first
+  approved sync.
 - `quattro-bt-phone` CLI. `dial` asks for confirmation unless `--yes` is given.
 - Project documentation, research notes and repository workflow.
 - Contribution guide aligned with Omarchy's style, theming and commit conventions.

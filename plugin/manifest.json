@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "jjb.bt-phone",
+  "name": "Bluetooth Phone",
+  "version": "0.0.1",
+  "author": "JJB-IT",
+  "description": "Make and take calls with your Bluetooth-paired phone. Needs the quattro-bt-phoned service.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Phone",
+    "description": "Dialer, contacts, recents and calls from your Bluetooth-paired phone.",
+    "category": "System",
+    "allowMultiple": false
+  }
+}

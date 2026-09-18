@@ -41,6 +41,23 @@ jobs:
           jq -e '.schemaVersion == 1 and (.id | test("^[a-z0-9-]+\\.[a-z0-9.-]+$")) and (.id | startswith("omarchy.") | not)' plugin/manifest.json
           for f in $(jq -r '.entryPoints[]' plugin/manifest.json); do test -f "plugin/$f" || { echo "missing $f"; exit 1; }; done
           if find plugin -type l | grep -q .; then echo "symlinks are not allowed in the plugin folder"; exit 1; fi
+      - name: Theme tokens only (no literal colours, fonts or pixel sizes)
+        run: |
+          if [ ! -d plugin ]; then exit 0; fi
+          pattern='"#[0-9a-fA-F]{3,8}"|Qt\.(rgba|rgb|hsla|hsva)\(|color: *"[a-z]+"|font\.family: *"|pixelSize: *[0-9]'
+          if grep -rnE "$pattern" --include='*.qml' plugin | grep -v '"transparent"'; then
+            echo "::error::Use Color.*, Style.* or bar.* tokens instead of literals (see CONTRIBUTING.md)"
+            exit 1
+          fi
+
+
+  editorconfig:
+    name: EditorConfig
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: editorconfig-checker/action-editorconfig-checker@v2
+      - run: editorconfig-checker
 
   nix:
     name: Nix build

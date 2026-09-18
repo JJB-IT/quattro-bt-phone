@@ -14,6 +14,7 @@ Item {
   property var recents: []
   property var recordings: []
   property var audioDevices: ({ outputs: [], inputs: [] })
+  property var ringtones: ({ dir: "", files: [] })
   readonly property bool online: state !== null
 
   // A command the user started failed; the panel shows the message.
@@ -52,6 +53,8 @@ Item {
       recents = m.entries
     } else if (m.type === "recordings") {
       recordings = m.recordings
+    } else if (m.type === "ringtones") {
+      ringtones = { dir: m.dir, files: m.files }
     } else if (m.type === "audio_devices") {
       audioDevices = { outputs: m.outputs, inputs: m.inputs }
     } else if (m.type === "reply" && m.id !== undefined) {

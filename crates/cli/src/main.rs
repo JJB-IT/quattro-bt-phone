@@ -5,7 +5,7 @@ use std::os::unix::net::UnixStream;
 
 use anyhow::{Context, bail};
 use clap::{Parser, Subcommand, ValueEnum};
-use qbp_proto::{AudioDirection, AudioRoute, Command, Message, Request, SimEvent, State};
+use qbp_proto::{AudioDirection, AudioRoute, Command, Message, Request, RingbackStyle, SimEvent, State};
 
 /// Control phone calls through quattro-bt-phoned.
 #[derive(Parser, Debug)]
@@ -84,6 +84,13 @@ enum Cmd {
         #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
         on: bool,
     },
+    /// The ringing tone you hear while an outgoing call rings. `custom` takes a file name
+    /// from `ringtones`.
+    Ringback { style: Ringback, file: Option<String> },
+    /// List your own ringing tones and the folder they go in.
+    Ringtones,
+    /// Pick an audio file as the ringing tone, in the desktop's file chooser.
+    ChooseRingtone,
     /// Simulate phone events (daemon must run with --mock).
     Simulate { event: Sim, number: Option<String> },
 }
@@ -92,6 +99,21 @@ enum Cmd {
 enum Route {
     Laptop,
     Phone,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+enum Ringback {
+    /// 425 Hz, long single ring (most of Europe).
+    Europe,
+    /// 400+450 Hz double ring (UK, Ireland, South Africa, Australia).
+    Uk,
+    /// 440+480 Hz.
+    NorthAmerica,
+    /// Two soft rising notes.
+    Chime,
+    /// Your own file (see `ringtones`).
+    Custom,
+    Off,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -149,6 +171,19 @@ fn main() -> anyhow::Result<()> {
         Cmd::AllowContacts => Command::RequestContacts,
         Cmd::AutoRecord { on } => Command::SetAutoRecord { enabled: on },
         Cmd::KeypadSounds { on } => Command::SetKeypadSounds { enabled: on },
+        Cmd::Ringtones => Command::GetRingtones,
+        Cmd::ChooseRingtone => Command::ChooseRingtone,
+        Cmd::Ringback { style, file } => Command::SetRingback {
+            file,
+            style: match style {
+                Ringback::Europe => RingbackStyle::Europe,
+                Ringback::Uk => RingbackStyle::Uk,
+                Ringback::NorthAmerica => RingbackStyle::NorthAmerica,
+                Ringback::Chime => RingbackStyle::Chime,
+                Ringback::Custom => RingbackStyle::Custom,
+                Ringback::Off => RingbackStyle::Off,
+            },
+        },
         Cmd::Simulate { event, number } => Command::Simulate {
             event: match event {
                 Sim::Ring => SimEvent::Ring,
@@ -200,6 +235,12 @@ fn main() -> anyhow::Result<()> {
                     for d in list {
                         println!("  {:<40} {}", d.description, d.name);
                     }
+                }
+            }
+            Message::Ringtones { dir, files } => {
+                println!("{dir}");
+                for f in files {
+                    println!("  {f}");
                 }
             }
             Message::Recordings { recordings } => {

@@ -22,6 +22,7 @@ use crate::notify::{self, Notifier, Urgency};
 use crate::pbap;
 use crate::store::Store;
 use crate::telephony::{self, Gateway, RawCall};
+use crate::tones::Ringback;
 
 /// How long "Allow calls" waits for the phone before giving up.
 const PERMISSION_TIMEOUT: Duration = Duration::from_secs(45);
@@ -42,6 +43,8 @@ enum Done {
     SyncApproved,
     /// The result, for the phone with this address.
     Sync(String, Result<pbap::Pulled, pbap::Error>),
+    /// The file chooser closed: the picked file, or `None` if cancelled.
+    RingtonePicked(anyhow::Result<Option<PathBuf>>),
 }
 
 struct Tracked {
@@ -78,6 +81,7 @@ pub struct Real {
     was_connected: bool,
     done: mpsc::Sender<Done>,
     audio: Router,
+    ringback: Ringback,
     /// When `dial` last went to the phone: the outgoing call that appears next is ours.
     dialled_at: Option<Instant>,
     /// Last seen SCO transport state, for the log.
@@ -105,6 +109,8 @@ pub async fn run(
                 audio_output: config.audio_output.clone(),
                 audio_input: config.audio_input.clone(),
                 keypad_sounds: config.keypad_sounds,
+                ringback: config.ringback,
+                ringback_file: config.ringback_file.clone(),
             },
             ..Default::default()
         },
@@ -120,6 +126,7 @@ pub async fn run(
         calls_requested: None,
         calls_denied: false,
         audio: Router::default(),
+        ringback: Ringback::default(),
         dialled_at: None,
         transport: None,
         connecting: false,
@@ -392,6 +399,19 @@ impl Real {
             tracing::info!(from = ?self.transport, to = ?transport, "call audio transport");
             self.transport = transport.clone();
         }
+        // The phone keeps the network's ringing tone to itself (it won't hand over audio before
+        // the call connects), so play one here while a call placed from this computer rings.
+        let ringing_out = transport.as_deref() != Some("active")
+            && self.tracked.values().any(|t| t.on_computer && t.last_state == CallState::Alerting);
+        if ringing_out {
+            self.ringback.start(
+                self.config.ringback,
+                self.config.ringback_file.as_deref(),
+                self.config.audio_output.as_deref(),
+            );
+        } else {
+            self.ringback.stop();
+        }
         if transport.as_deref() != Some("active")
             && let Some(gw) = self.gateway.clone()
         {
@@ -495,8 +515,33 @@ impl Real {
         self.store.as_ref().map(|(_, s)| s).ok_or_else(|| anyhow!("no phone selected"))
     }
 
+    /// Copy a picked file into the ringtones folder and make it the ringing tone.
+    fn use_ringtone(&mut self, picked: &std::path::Path) -> anyhow::Result<()> {
+        let name = picked.file_name().and_then(|n| n.to_str()).context("the file has no usable name")?;
+        let dir = crate::tones::ringtones_dir();
+        std::fs::create_dir_all(&dir)?;
+        let target = dir.join(name);
+        if picked != target {
+            std::fs::copy(picked, &target).with_context(|| format!("copying {}", picked.display()))?;
+        }
+        tracing::info!(%name, "custom ringing tone");
+        self.config.ringback = RingbackStyle::Custom;
+        self.config.ringback_file = Some(name.to_string());
+        self.state.settings.ringback = RingbackStyle::Custom;
+        self.state.settings.ringback_file = Some(name.to_string());
+        self.save_config();
+        Ok(())
+    }
+
     fn finish(&mut self, done: Done) {
         match done {
+            Done::RingtonePicked(Ok(Some(path))) => {
+                if let Err(e) = self.use_ringtone(&path) {
+                    tracing::warn!("custom ringing tone: {e:#}");
+                }
+            }
+            Done::RingtonePicked(Ok(None)) => {}
+            Done::RingtonePicked(Err(e)) => tracing::warn!("choosing a ringing tone: {e:#}"),
             Done::Connect(r) => {
                 self.connecting = false;
                 if let Err(e) = r {
@@ -683,6 +728,34 @@ impl Real {
             }
             Command::GetRecordings => return Ok(Some(Message::Recordings { recordings: Vec::new() })),
 
+            Command::SetRingback { style, file } => {
+                if style == RingbackStyle::Custom {
+                    let name = file.as_deref().context("choose a file for a custom ringing tone")?;
+                    anyhow::ensure!(
+                        crate::tones::ringtones()?.iter().any(|f| f == name),
+                        "{name} isn't in the ringtones folder"
+                    );
+                    self.config.ringback_file = file.clone();
+                    self.state.settings.ringback_file = file;
+                }
+                self.config.ringback = style;
+                self.state.settings.ringback = style;
+                self.save_config();
+                self.ringback.stop();
+                self.route_audio().await;
+            }
+            Command::ChooseRingtone => {
+                let (session, done) = (self.session.clone(), self.done.clone());
+                tokio::spawn(async move {
+                    let picked = crate::portal::pick_audio_file(&session, "Choose a ringing tone").await;
+                    let _ = done.send(Done::RingtonePicked(picked)).await;
+                });
+            }
+            Command::GetRingtones => {
+                let files = crate::tones::ringtones()?;
+                let dir = crate::tones::ringtones_dir().display().to_string();
+                return Ok(Some(Message::Ringtones { dir, files }));
+            }
             Command::SetKeypadSounds { enabled } => {
                 self.config.keypad_sounds = enabled;
                 self.state.settings.keypad_sounds = enabled;

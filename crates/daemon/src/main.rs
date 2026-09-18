@@ -5,6 +5,7 @@ mod config;
 mod dbus;
 mod notify;
 mod pbap;
+mod portal;
 mod server;
 mod store;
 mod telephony;

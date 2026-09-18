@@ -22,6 +22,10 @@ pub struct Config {
     pub audio_input: Option<String>,
     /// Play a tone for each dialled digit.
     pub keypad_sounds: bool,
+    /// Ringing tone while an outgoing call rings: `europe`, `uk`, `north_america` or `off`.
+    pub ringback: qbp_proto::RingbackStyle,
+    /// With `ringback = "custom"`: a file name in `~/.config/quattro-bt-phone/ringtones/`.
+    pub ringback_file: Option<String>,
 }
 
 impl Config {

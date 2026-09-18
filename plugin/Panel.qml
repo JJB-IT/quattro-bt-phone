@@ -38,6 +38,9 @@ Panel {
   readonly property string audioOutput: state && state.settings.audio_output ? state.settings.audio_output : ""
   readonly property string audioInput: state && state.settings.audio_input ? state.settings.audio_input : ""
   readonly property bool keypadSounds: state ? !!state.settings.keypad_sounds : false
+  readonly property string ringback: state && state.settings.ringback ? state.settings.ringback : "europe"
+  readonly property string ringbackFile: state && state.settings.ringback_file ? state.settings.ringback_file : ""
+  onRingbackFileChanged: if (daemonClient.online) daemonClient.send("get_ringtones")
   readonly property var contacts: daemonClient.contacts
   readonly property var recents: daemonClient.recents
   readonly property var recordings: daemonClient.recordings
@@ -251,7 +254,7 @@ Panel {
             id: devLabels
             anchors.left: devIcon.right
             anchors.leftMargin: Style.space(12)
-            anchors.right: gear.left
+            anchors.right: gear.visible ? gear.left : batt.visible ? batt.left : parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
             Text {
@@ -279,7 +282,6 @@ Panel {
             anchors.rightMargin: batt.visible ? Style.space(10) : 0
             anchors.verticalCenter: parent.verticalCenter
             visible: root.phase === "idle" || root.inCall
-            width: visible ? implicitWidth : 0
             text: root.icons.cog
             color: root.settingsOpen ? root.accent : root.fg
             opacity: root.settingsOpen || gearArea.containsMouse ? 1 : 0.6

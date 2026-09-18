@@ -15,6 +15,7 @@ use tokio::sync::{mpsc, watch};
 use zbus::Connection;
 
 use super::{Job, Outcome, now, publish, validate_dial, validate_tones};
+use crate::audio::{Devices, Router};
 use crate::bluez::{self, BtDevice};
 use crate::config::Config;
 use crate::notify::{self, Notifier, Urgency};
@@ -26,6 +27,8 @@ use crate::telephony::{self, Gateway, RawCall};
 const PERMISSION_TIMEOUT: Duration = Duration::from_secs(45);
 /// Safety net in case a signal is missed.
 const POLL: Duration = Duration::from_secs(30);
+/// How often to look for the phone's audio nodes while a call waits for them.
+const AUDIO_RETRY: Duration = Duration::from_millis(500);
 /// Most entries `get_recents` returns.
 const RECENTS_LIMIT: usize = 200;
 
@@ -68,6 +71,7 @@ pub struct Real {
     /// Whether the phone was connected at the last refresh, to notice it (re)connecting.
     was_connected: bool,
     done: mpsc::Sender<Done>,
+    audio: Router,
 }
 
 pub async fn run(
@@ -97,6 +101,7 @@ pub async fn run(
         ring_notification: None,
         calls_requested: None,
         calls_denied: false,
+        audio: Router::default(),
         connecting: false,
         syncing: false,
         was_connected: false,
@@ -106,6 +111,7 @@ pub async fn run(
     publish(&state_tx, &real.state);
 
     let mut poll = tokio::time::interval(POLL);
+    let mut audio_retry = tokio::time::interval(AUDIO_RETRY);
     loop {
         tokio::select! {
             job = jobs.recv() => {
@@ -121,6 +127,7 @@ pub async fn run(
                 real.refresh().await;
             }
             _ = poll.tick() => real.refresh().await,
+            _ = audio_retry.tick(), if real.audio.pending() => real.route_audio().await,
         }
         publish(&state_tx, &real.state);
     }
@@ -192,6 +199,7 @@ impl Real {
 
         let raw = self.gateway.as_ref().map(|g| g.calls.clone()).unwrap_or_default();
         self.track_calls(raw).await;
+        self.route_audio().await;
 
         let connected = self.state.phone.connected;
         if connected && !self.was_connected {
@@ -348,6 +356,25 @@ impl Real {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Bridge the call audio while a call's audio is on the computer.
+    async fn route_audio(&mut self) {
+        let live = self
+            .gateway
+            .as_ref()
+            .filter(|g| g.transport.as_deref() == Some("active") && !g.calls.is_empty())
+            .map(|g| g.address.clone());
+        match live {
+            Some(address) => {
+                let devices = Devices {
+                    output: self.config.audio_output.as_deref(),
+                    input: self.config.audio_input.as_deref(),
+                };
+                self.audio.start(&address, devices).await
+            }
+            None => self.audio.stop().await,
         }
     }
 

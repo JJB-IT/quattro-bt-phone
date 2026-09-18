@@ -22,6 +22,8 @@ All notable changes to this project are documented here. The format follows
   DTMF keypad, hold/swap, audio route, recording). A setup screen walks through choosing,
   connecting and allowing the phone. The panel opens by itself when the phone rings, and
   reconnects when the daemon restarts. It uses only the shell's theme tokens.
+- Call audio: while a call's audio is on the computer, the daemon bridges it to the speakers
+  and microphone (system default, or `audio_output`/`audio_input` in the config).
 - `quattro-bt-phone` CLI. `dial` asks for confirmation unless `--yes` is given.
 - Project documentation, research notes and repository workflow.
 - Contribution guide aligned with Omarchy's style, theming and commit conventions.

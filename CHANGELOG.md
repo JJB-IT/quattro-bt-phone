@@ -8,3 +8,4 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - Project documentation, research notes and repository workflow.
+- Contribution guide aligned with Omarchy's style, theming and commit conventions.

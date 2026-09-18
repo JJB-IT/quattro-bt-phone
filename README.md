@@ -120,6 +120,10 @@ omarchy plugin validate plugin
 For UI work without a phone, run the daemon with `--mock`. It replays a scripted call.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and PR workflow.
 
+The code follows Omarchy's own conventions (`AGENTS.md`, `docs/theming.md`, `.editorconfig`).
+The plugin uses only the shell's theme tokens, so it restyles itself whenever you switch Omarchy
+themes. It's meant to be easy to adopt upstream.
+
 ## Credits
 
 - [PipeWire Telephony](https://gkiagia.gr/2025-02-20-pipewire-telephony/) by George Kiagiadakis.

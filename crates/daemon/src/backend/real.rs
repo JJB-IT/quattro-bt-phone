@@ -18,12 +18,15 @@ use super::{Job, Outcome, now, publish, validate_dial, validate_tones};
 use crate::bluez::{self, BtDevice};
 use crate::config::Config;
 use crate::notify::{self, Notifier, Urgency};
+use crate::store::Store;
 use crate::telephony::{self, Gateway, RawCall};
 
 /// How long "Allow calls" waits for the phone before giving up.
 const PERMISSION_TIMEOUT: Duration = Duration::from_secs(45);
 /// Safety net in case a signal is missed.
 const POLL: Duration = Duration::from_secs(30);
+/// Most entries `get_recents` returns.
+const RECENTS_LIMIT: usize = 200;
 
 /// Results of slow operations that run off the main loop.
 enum Done {
@@ -36,6 +39,7 @@ struct Tracked {
     started_at: Option<i64>,
     number: String,
     name: Option<String>,
+    label: Option<String>,
     last_state: CallState,
 }
 
@@ -48,7 +52,8 @@ pub struct Real {
     devices: Vec<BtDevice>,
     gateway: Option<Gateway>,
     tracked: HashMap<String, Tracked>,
-    call_log: Vec<RecentCall>,
+    /// The cache for the selected phone, with that phone's address.
+    store: Option<(String, Store)>,
     notifier: Notifier,
     ring_notification: Option<u32>,
     calls_requested: Option<Instant>,
@@ -80,7 +85,7 @@ pub async fn run(
         devices: Vec::new(),
         gateway: None,
         tracked: HashMap::new(),
-        call_log: Vec::new(),
+        store: None,
         ring_notification: None,
         calls_requested: None,
         calls_denied: false,
@@ -129,6 +134,7 @@ impl Real {
         self.auto_select_phone();
 
         let address = self.config.phone.clone().unwrap_or_default();
+        self.open_store(&address);
         self.gateway =
             gateways.into_iter().find(|g| !address.is_empty() && g.address.eq_ignore_ascii_case(&address));
         let device = self.phone_device().cloned();
@@ -211,26 +217,35 @@ impl Real {
                     newly_ringing = Some(id.clone());
                 }
                 tracing::info!(?direction, ?state, "call appeared");
+                let (name, label) = match lookup(&self.store, &rc.number) {
+                    Some((name, label)) => (Some(name), Some(label)),
+                    None => ((!rc.name.is_empty()).then(|| rc.name.clone()), None),
+                };
                 Tracked {
                     direction,
                     started_at: None,
                     number: rc.number.clone(),
-                    name: (!rc.name.is_empty()).then(|| rc.name.clone()),
+                    name,
+                    label,
                     last_state: state,
                 }
             });
             if state == CallState::Active && t.started_at.is_none() {
                 t.started_at = Some(now());
             }
-            if !rc.number.is_empty() {
+            // Incoming numbers can arrive after the call appears (the +CLIP after the first RING).
+            if !rc.number.is_empty() && rc.number != t.number {
                 t.number = rc.number.clone();
+                if let Some((name, label)) = lookup(&self.store, &t.number) {
+                    (t.name, t.label) = (Some(name), Some(label));
+                }
             }
             t.last_state = state;
             calls.push(Call {
                 id,
                 number: t.number.clone(),
                 name: t.name.clone(),
-                label: None,
+                label: t.label.clone(),
                 state,
                 direction: t.direction,
                 started_at: t.started_at,
@@ -277,18 +292,58 @@ impl Real {
             let who = t.name.clone().unwrap_or_else(|| display_number(&t.number));
             self.notifier.show("Missed call", &who, notify::GLYPH_MISSED, Urgency::Normal).await;
         }
-        self.call_log.insert(
-            0,
-            RecentCall {
-                number: t.number,
-                name: t.name,
-                kind,
-                at: t.started_at.unwrap_or_else(now),
-                duration: t.started_at.map(|s| (now() - s).max(0) as u32),
-                count: 1,
-                recording: None,
-            },
-        );
+        let entry = RecentCall {
+            number: t.number,
+            name: t.name,
+            kind,
+            at: t.started_at.unwrap_or_else(now),
+            duration: t.started_at.map(|s| (now() - s).max(0) as u32),
+            count: 1,
+            recording: None,
+        };
+        if let Some((_, store)) = &self.store
+            && let Err(e) = store.log_call(&entry)
+        {
+            tracing::warn!("logging the call: {e:#}");
+        }
+    }
+
+    /// Open the cache for `address` when the selected phone changes.
+    fn open_store(&mut self, address: &str) {
+        if self.store.as_ref().is_some_and(|(a, _)| a.eq_ignore_ascii_case(address)) {
+            return;
+        }
+        self.store = None;
+        if address.is_empty() {
+            return;
+        }
+        let path = Store::path_for(address);
+        let store = Store::open(&path).or_else(|e| {
+            tracing::warn!("{e:#}; keeping contacts and call history in memory only");
+            Store::in_memory()
+        });
+        match store {
+            Ok(store) => {
+                self.store = Some((address.to_string(), store));
+                self.update_sync_counts();
+            }
+            Err(e) => tracing::warn!("no contact cache: {e:#}"),
+        }
+    }
+
+    fn update_sync_counts(&mut self) {
+        let Some((_, store)) = &self.store else { return };
+        match store.counts() {
+            Ok(c) => {
+                let sync = &mut self.state.sync;
+                (sync.contacts, sync.history, sync.last_synced) = (c.contacts, c.history, c.last_synced);
+            }
+            Err(e) => tracing::warn!("reading the contact cache: {e:#}"),
+        }
+    }
+
+    fn store(&self) -> anyhow::Result<&Store> {
+        self.store.as_ref().map(|(_, s)| s).ok_or_else(|| anyhow!("no phone selected"))
     }
 
     fn finish(&mut self, done: Done) {
@@ -416,14 +471,12 @@ impl Real {
                 bail!("mute is not implemented yet: it needs the audio routing from #3")
             }
 
-            Command::GetContacts { .. } => return Ok(Some(Message::Contacts { contacts: Vec::new() })),
+            Command::GetContacts { query } => {
+                let contacts = self.store()?.contacts(query.as_deref())?;
+                return Ok(Some(Message::Contacts { contacts }));
+            }
             Command::GetRecents { missed_only } => {
-                let entries = self
-                    .call_log
-                    .iter()
-                    .filter(|r| !missed_only || r.kind == RecentKind::Missed)
-                    .cloned()
-                    .collect();
+                let entries = self.store()?.recents(missed_only, RECENTS_LIMIT)?;
                 return Ok(Some(Message::Recents { entries }));
             }
             Command::GetRecordings => return Ok(Some(Message::Recordings { recordings: Vec::new() })),
@@ -450,6 +503,15 @@ fn stage_text(stage: SetupStage) -> &'static str {
         SetupStage::NeedsCalls => "calls not allowed on the phone",
         SetupStage::Ready => "ready",
     }
+}
+
+/// Contact name and number label for a caller, if the phonebook knows the number.
+fn lookup(store: &Option<(String, Store)>, number: &str) -> Option<(String, String)> {
+    let (_, store) = store.as_ref()?;
+    store.lookup(number).unwrap_or_else(|e| {
+        tracing::warn!("looking up a caller: {e:#}");
+        None
+    })
 }
 
 fn display_number(n: &str) -> String {

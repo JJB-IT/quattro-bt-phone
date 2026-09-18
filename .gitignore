@@ -16,3 +16,6 @@ __pycache__/
 /cache/
 *.vcf
 *.ogg
+
+# Fake vCards used as test fixtures
+!crates/*/testdata/*.vcf

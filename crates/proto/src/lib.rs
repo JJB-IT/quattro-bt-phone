@@ -115,6 +115,17 @@ pub enum Command {
     SetAutoRecord {
         enabled: bool,
     },
+    /// Turn the keypad sounds on or off (saved to config).
+    SetKeypadSounds {
+        enabled: bool,
+    },
+    /// Play the keypad sound for `key` (`0-9 * #`): its DTMF tone, or a soft tick for a key
+    /// typed on the keyboard. Does nothing while keypad sounds are off.
+    PlayKeySound {
+        key: String,
+        #[serde(default)]
+        soft: bool,
+    },
     StartRecording,
     StopRecording {
         #[serde(default)]
@@ -390,6 +401,9 @@ pub struct Settings {
     /// `node.name` of the microphone for calls; `None` = the system default.
     #[serde(default)]
     pub audio_input: Option<String>,
+    /// Beep when dialling.
+    #[serde(default)]
+    pub keypad_sounds: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

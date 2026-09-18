@@ -20,6 +20,8 @@ pub struct Config {
     pub audio_output: Option<String>,
     /// PipeWire `node.name` of the microphone for calls. Unset: the system default.
     pub audio_input: Option<String>,
+    /// Play a tone for each dialled digit.
+    pub keypad_sounds: bool,
 }
 
 impl Config {

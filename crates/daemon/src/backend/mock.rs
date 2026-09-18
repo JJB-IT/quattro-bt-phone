@@ -384,6 +384,13 @@ impl Mock {
             }
 
             Command::SetAutoRecord { enabled } => self.state.settings.auto_record = enabled,
+            Command::SetKeypadSounds { enabled } => self.state.settings.keypad_sounds = enabled,
+            // Real sound even in --mock: it's the easiest way to hear what the panel does.
+            Command::PlayKeySound { key, soft } => {
+                if self.state.settings.keypad_sounds {
+                    crate::tones::play(&key, soft, None)?;
+                }
+            }
             Command::StartRecording => {
                 anyhow::ensure!(self.state.audio.route == AudioRoute::Laptop, "call audio is on the phone");
                 let id = self.call_mut(&None, |c| c.state == CallState::Active)?.id.clone();

@@ -104,6 +104,7 @@ pub async fn run(
                 auto_record: config.auto_record,
                 audio_output: config.audio_output.clone(),
                 audio_input: config.audio_input.clone(),
+                keypad_sounds: config.keypad_sounds,
             },
             ..Default::default()
         },
@@ -682,6 +683,16 @@ impl Real {
             }
             Command::GetRecordings => return Ok(Some(Message::Recordings { recordings: Vec::new() })),
 
+            Command::SetKeypadSounds { enabled } => {
+                self.config.keypad_sounds = enabled;
+                self.state.settings.keypad_sounds = enabled;
+                self.save_config();
+            }
+            Command::PlayKeySound { key, soft } => {
+                if self.config.keypad_sounds {
+                    crate::tones::play(&key, soft, self.config.audio_output.as_deref())?;
+                }
+            }
             Command::SetAutoRecord { enabled } => {
                 self.config.auto_record = enabled;
                 self.state.settings.auto_record = enabled;

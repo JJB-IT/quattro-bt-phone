@@ -2,7 +2,8 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 
-// Speakers and microphone for calls. Changes apply at once, also during a call.
+// Speakers and microphone for calls (changes apply at once, also during a call) and keypad
+// sounds.
 Item {
   id: root
   property var app
@@ -39,7 +40,7 @@ Item {
       Text {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        text: "Call audio"
+        text: "Settings"
         color: app.fg; font.family: app.font; font.pixelSize: Style.font.body; font.bold: true
       }
       Text {
@@ -87,6 +88,38 @@ Item {
       wrapMode: Text.WordWrap
       text: "Used while a call's audio is on the laptop. A Bluetooth headset switches to its low-quality headset mode when its microphone is in use."
       color: app.fg; opacity: 0.55; font.family: app.font; font.pixelSize: Style.font.caption
+    }
+
+    PanelSeparator { foreground: app.fg }
+
+    Item {
+      width: parent.width
+      height: Math.max(soundsToggle.height, soundsLabels.implicitHeight)
+      Column {
+        id: soundsLabels
+        anchors.left: parent.left
+        anchors.right: soundsToggle.left
+        anchors.rightMargin: Style.space(10)
+        anchors.verticalCenter: parent.verticalCenter
+        Text {
+          text: "Keypad sounds"
+          color: app.fg; font.family: app.font; font.pixelSize: Style.font.body; font.bold: true
+        }
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: "A dial tone for each key you click, and a soft tick for digits you type."
+          color: app.fg; opacity: 0.55; font.family: app.font; font.pixelSize: Style.font.caption
+        }
+      }
+      ToggleSwitch {
+        id: soundsToggle
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        checked: app.keypadSounds
+        foreground: app.fg
+        onToggled: app.daemon.act("set_keypad_sounds", { enabled: !app.keypadSounds })
+      }
     }
   }
 }
